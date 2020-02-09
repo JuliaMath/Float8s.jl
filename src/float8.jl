@@ -2,7 +2,8 @@ abstract type AbstractFloat8 <: AbstractFloat end
 primitive type Float8 <: AbstractFloat8 8 end        # standard 3 exp version
 primitive type Float8_4 <: AbstractFloat8 8 end      # version with 4 exp bits
 
-import Base: (-),bitstring,isnan,iszero,one,zero,abs,isfinite
+import Base: (-),bitstring,isnan,iszero,one,zero,abs,isfinite,floatmin,floatmax,
+typemin,typemax
 
 Float8(x::UInt8) = reinterpret(Float8,x)
 Float8_4(x::UInt8) = reinterpret(Float8_4,x)
@@ -15,6 +16,15 @@ significand_mask(::Type{Float8}) = 0x0f
 significand_mask(::Type{Float8_4}) = 0x07
 # exponent_one(::Type{Float16}) =     0x3c00
 # exponent_half(::Type{Float16}) =    0x3800
+
+typemin(::Type{Float8})
+typemax(::Type{Float8})
+
+floatmin(::Type{Float8}) = Float8(0x10)
+floatmin(::Type{Float8_4}) = Float8_4(0x08)
+floatmax(::Type{Float8}) = Float8(0x6f)
+floatmax(::Type{Float8_4}) = Float8_4(0x77)
+
 
 one(::Type{Float8}) = Float8(0x30)
 one(::Type{Float8_4}) = Float8_4(0x38)
