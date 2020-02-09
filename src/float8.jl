@@ -1,4 +1,43 @@
-primitive type Float8 <: AbstractFloat 8 end
+abstract type AbstractFloat8 <: AbstractFloat end
+primitive type Float8 <: AbstractFloat8 8 end        # standard 3 exp version
+primitive type Float8_4 <: AbstractFloat8 8 end      # version with 4 exp bits
+
+import Base: (-),bitstring,isnan,iszero,one,zero,abs,isfinite
+
+Float8(x::UInt8) = reinterpret(Float8,x)
+Float8_4(x::UInt8) = reinterpret(Float8_4,x)
+bitstring(x::AbstractFloat8) = bitstring(reinterpret(UInt8,x))
+
+sign_mask(::Type{AbstractFloat8}) = 0x80
+exponent_mask(::Type{Float8}) = 0x70
+exponent_mask(::Type{Float8_4}) = 0x78
+significand_mask(::Type{Float8}) = 0x0f
+significand_mask(::Type{Float8_4}) = 0x07
+# exponent_one(::Type{Float16}) =     0x3c00
+# exponent_half(::Type{Float16}) =    0x3800
+
+one(::Type{Float8}) = Float8(0x30)
+one(::Type{Float8_4}) = Float8_4(0x38)
+zero(::Type{T}) where {T<:AbstractFloat8} = Float8(0x00)
+
+one(x::AbstractFloat8) = one(typeof(x))
+zero(x::AbstractFloat8) = zero(typeof(x))
+
+# is positive zero 0x00 or negative zero 0x80
+iszero(x::AbstractFloat8) = reinterpret(UInt8, x) == 0x00 || reinterpret(UInt8,x) == 0x80
+
+-(x::T) where {T<:AbstractFloat8} = reinterpret(T, reinterpret(UInt8, x) ⊻ 0x80)
+
+Bool(x::AbstractFloat8) = iszero(x) ? false : isone(x) ? true : throw(InexactError(:Bool, Bool, x))
+
+abs(x::T) where {T<:AbstractFloat8} = reinterpret(T, reinterpret(UInt8, x) & 0x7f)
+isnan(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x) & 0x7f > exponent_mask(T)
+isfinite(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x) & exponent_mask(T) != exponent_mask(T)
+
+precision(::Type{Float8}) = 5
+precision(::Type{Float8_4}) = 4
+
+
 
 # Float32 -> Float16 algorithm from:
 #   "Fast Half Float Conversion" by Jeroen van der Zijp
@@ -110,14 +149,14 @@ primitive type Float8 <: AbstractFloat 8 end
 #     return reinterpret(Float32, ret)
 # end
 
-Bool(x::Float8) = x==0 ? false : x==1 ? true : throw(InexactError(:Bool, Bool, x))
 
 round(x::Float8, r::RoundingMode{:ToZero}) = Float8(round(Float32(x), r))
 round(x::Float8, r::RoundingMode{:Down}) = Float8(round(Float32(x), r))
 round(x::Float8, r::RoundingMode{:Up}) = Float8(round(Float32(x), r))
 round(x::Float8, r::RoundingMode{:Nearest}) = Float8(round(Float32(x), r))
 
--(x::Float8) = reinterpret(Float8, reinterpret(UInt8, x) ⊻ 0x80)
+
+
 
 function ==(x::Float8, y::Float8)
     if isnan(x) || isnan(y) # For Float16: (ix|iy)&0x7fff > 0x7c00
@@ -135,11 +174,7 @@ for op in (:<, :<=, :isless)
     @eval ($op)(a::Float8, b::Float8) = ($op)(Float32(a), Float32(b))
 end
 
-abs(x::Float8) = reinterpret(Float8, reinterpret(UInt8, x) & 0x7f)
-isnan(x::Float8) = reinterpret(UInt8,x)&0x7f > exponent_mask(Float8)
-isfinite(x::Float8) = reinterpret(UInt8,x)&exponent_mas(Float8) != exponent_mask(Float8)
 
-precision(::Type{Float8}) = 4
 
 @eval begin
     typemin(::Type{Float16}) = $(bitcast(Float16, 0xfc00))
@@ -154,12 +189,6 @@ precision(::Type{Float8}) = 4
     eps(::Type{Float16}) = $(bitcast(Float16, 0x1400))
 end
 
-sign_mask(::Type{Float8}) = 0x80
-exponent_mask(::Type{Float8}) = 0x78        # 0x78 for 4 exp bits, 0x70 for 3 exp bits
-# exponent_one(::Type{Float16}) =     0x3c00
-# exponent_half(::Type{Float16}) =    0x3800
-significand_mask(::Type{Float8}) = 0x07     # 0x07 for 4 exp bits, 0x0f for 3 exp bits
-
 for T in (Float16, Float32, Float64)
     @eval significand_bits(::Type{$T}) = $(trailing_ones(significand_mask(T)))
     @eval exponent_bits(::Type{$T}) = $(sizeof(T)*8 - significand_bits(T) - 1)
@@ -169,8 +198,3 @@ for T in (Float16, Float32, Float64)
     # maximum float exponent without bias
     @eval exponent_raw_max(::Type{$T}) = $(Int(exponent_mask(T) >> significand_bits(T)))
 end
-
-uinttype(::Type{Float8}) = UInt8
-iszero(x::Float8) = reinterpret(UInt8, x) & ~sign_mask(Float8) == 0x00
-Float8(x::UInt8) = reinterpret(Float8,x)
-bitstring(x::Float8) = bitstring(reinterpret(UInt8,x))
