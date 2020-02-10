@@ -2,30 +2,46 @@ abstract type AbstractFloat8 <: AbstractFloat end
 primitive type Float8 <: AbstractFloat8 8 end        # standard 3 exp version
 primitive type Float8_4 <: AbstractFloat8 8 end      # version with 4 exp bits
 
-import Base: (-),bitstring,isnan,iszero,one,zero,abs,isfinite,floatmin,floatmax,
-typemin,typemax
-
 Float8(x::UInt8) = reinterpret(Float8,x)
 Float8_4(x::UInt8) = reinterpret(Float8_4,x)
 bitstring(x::AbstractFloat8) = bitstring(reinterpret(UInt8,x))
 
-sign_mask(::Type{AbstractFloat8}) = 0x80
+# masks, UInt8s with 1s for the respective parts
+sign_mask(::Type{T}) where {T<:AbstractFloat8} = 0x80
 exponent_mask(::Type{Float8}) = 0x70
 exponent_mask(::Type{Float8_4}) = 0x78
 significand_mask(::Type{Float8}) = 0x0f
 significand_mask(::Type{Float8_4}) = 0x07
-# exponent_one(::Type{Float16}) =     0x3c00
-# exponent_half(::Type{Float16}) =    0x3800
 
-typemin(::Type{Float8})
-typemax(::Type{Float8})
+# number of exp/sig bits
+n_exponent_bits(::Type{Float8}) = 3
+n_exponent_bits(::Type{Float8_4}) = 4
+n_significant_bits(::Type{Float8}) = 4
+n_significant_bits(::Type{Float8_4}) = 3
 
+eps(::Type{Float8}) = Float8(0x02)
+eps(::Type{Float8_4}) = Float8_4(0x20)
+
+# define inifinities and nan
+inf8(::Type{Float8}) = Float8(0x70)
+inf8(::Type{Float8_4}) = Float8_4(0x78)
+
+nan8(::Type{Float8}) = Float8(0x78)
+nan8(::Type{Float8_4}) = Float8_4(0x7c)
+
+const NaN8 = nan8(Float8)
+const Inf8 = inf8(Float8)
+
+typemin(::Type{T}) where {T<:AbstractFloat8} = -inf8(T)
+typemax(::Type{T}) where {T<:AbstractFloat8} = inf8(T)
+
+# smallest non-subnormal number, largest representable number
 floatmin(::Type{Float8}) = Float8(0x10)
 floatmin(::Type{Float8_4}) = Float8_4(0x08)
 floatmax(::Type{Float8}) = Float8(0x6f)
 floatmax(::Type{Float8_4}) = Float8_4(0x77)
 
-
+# one and zero element
 one(::Type{Float8}) = Float8(0x30)
 one(::Type{Float8_4}) = Float8_4(0x38)
 zero(::Type{T}) where {T<:AbstractFloat8} = Float8(0x00)
@@ -35,9 +51,7 @@ zero(x::AbstractFloat8) = zero(typeof(x))
 
 # is positive zero 0x00 or negative zero 0x80
 iszero(x::AbstractFloat8) = reinterpret(UInt8, x) == 0x00 || reinterpret(UInt8,x) == 0x80
-
 -(x::T) where {T<:AbstractFloat8} = reinterpret(T, reinterpret(UInt8, x) ⊻ 0x80)
-
 Bool(x::AbstractFloat8) = iszero(x) ? false : isone(x) ? true : throw(InexactError(:Bool, Bool, x))
 
 abs(x::T) where {T<:AbstractFloat8} = reinterpret(T, reinterpret(UInt8, x) & 0x7f)
@@ -46,8 +60,6 @@ isfinite(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x) & exponent_mask(
 
 precision(::Type{Float8}) = 5
 precision(::Type{Float8_4}) = 4
-
-
 
 # Float32 -> Float16 algorithm from:
 #   "Fast Half Float Conversion" by Jeroen van der Zijp
@@ -117,94 +129,138 @@ precision(::Type{Float8_4}) = 4
 #     reinterpret(Float16, h)
 # end
 #
-# function Float32(val::Float16)
-#     local ival::UInt32 = reinterpret(UInt16, val)
-#     local sign::UInt32 = (ival & 0x8000) >> 15
-#     local exp::UInt32  = (ival & 0x7c00) >> 10
-#     local sig::UInt32  = (ival & 0x3ff) >> 0
-#     local ret::UInt32
-#
-#     if exp == 0
-#         if sig == 0
-#             sign = sign << 31
-#             ret = sign | exp | sig
-#         else
-#             n_bit = 1
-#             bit = 0x0200
-#             while (bit & sig) == 0
-#                 n_bit = n_bit + 1
-#                 bit = bit >> 1
-#             end
-#             sign = sign << 31
-#             exp = ((-14 - n_bit + 127) << 23) % UInt32
-#             sig = ((sig & (~bit)) << n_bit) << (23 - 10)
-#             ret = sign | exp | sig
-#         end
-#     elseif exp == 0x1f
-#         if sig == 0  # Inf
-#             if sign == 0
-#                 ret = 0x7f800000
-#             else
-#                 ret = 0xff800000
-#             end
-#         else  # NaN
-#             ret = 0x7fc00000 | (sign<<31) | (sig<<(23-10))
-#         end
-#     else
-#         sign = sign << 31
-#         exp  = ((exp - 15 + 127) << 23) % UInt32
-#         sig  = sig << (23 - 10)
-#         ret = sign | exp | sig
-#     end
-#     return reinterpret(Float32, ret)
-# end
 
+first_sig_bit_mask(::Type{Float8}) = 0x00000008
+first_sig_bit_mask(::Type{Float8_4}) = 0x00000004
 
-round(x::Float8, r::RoundingMode{:ToZero}) = Float8(round(Float32(x), r))
-round(x::Float8, r::RoundingMode{:Down}) = Float8(round(Float32(x), r))
-round(x::Float8, r::RoundingMode{:Up}) = Float8(round(Float32(x), r))
-round(x::Float8, r::RoundingMode{:Nearest}) = Float8(round(Float32(x), r))
+sig_bit_shift(::Type{Float8}) = 19          # 23 significand bits for Float32 - 4 significand bits for Float8
+sig_bit_shift(::Type{Float8_4}) = 20        # 23 significand bits for Float32 - 3 significand bits for Float8_4
 
+bias_difference(::Type{Float8}) = 0x0000007c    # = 124, 127 for Float32 minus 3 for Float 8
+bias_difference(::Type{Float8_4}) = 0x00000078    # = 120, 127 for Float32 minus 7 for Float 8_4
 
+exp_bits_all_one(::Type{Float8}) = 0x00000007
+exp_bits_all_one(::Type{Float8_4}) = 0x0000000f
 
+function Float32(val::T) where {T<:AbstractFloat8}
 
-function ==(x::Float8, y::Float8)
+    ival = reinterpret(UInt8, val)
+
+    # seperate into sign, exponent, significand
+    sign = UInt32((ival & sign_mask(T)) >> 7)
+    exp  = UInt32((ival & exponent_mask(T)) >> n_significant_bits(T))
+    sig = UInt32(ival & significand_mask(T))
+
+    if exp == zero(UInt32)
+        if sig == zero(UInt32)          # +-0 case
+            return reinterpret(Float32,sign << 31)
+        else                            # subnormals
+            n_bit = 1
+            # first significand bit set to one, else zero, to check for size of subnormal
+            bit = first_sig_bit_mask(T)
+            while (bit & sig) == 0
+                n_bit = n_bit + 1
+                bit = bit >> 1
+            end
+            sign = sign << 31
+
+            # bias = 2^(n_exp-1) - 1, i.e. 127 for Float32, 15 for Float16, 3 for Float8, 7 for Float8_4
+            # difference in bias + 1 has to be added, e.g. 127-3 = 124 = 0x0000007c
+
+            exp = ((bias_difference(T)+1 - n_bit) << 23) % UInt32
+            sig = ((sig & (~bit)) << n_bit) << sig_bit_shift(T)
+            ret = sign | exp | sig
+            reinterpret(Float32,ret)
+        end
+    elseif exp == exp_bits_all_one(T)       # Inf/NaN case
+        if sig == zero(UInt32)              # Infinity
+            if sign == zero(UInt32)
+                return Inf32
+            else
+                return -Inf32
+            end
+        else                # NaN, preserve sign and significand (first sig bit always 1)
+            # NaN32 == reinterpret(Flaot32,0x7fc00000)
+            ret = 0x7fc00000 | (sign<<31) | (sig<<sig_bit_shift(T))
+            reinterpret(Float32,ret)
+        end
+    else
+        sign = sign << 31
+
+        # bias = 2^(n_exp-1) - 1, i.e. 127 for Float32, 15 for Float16, 3 for Float8, 7 for Float8_4
+        # difference in bias has to be added, e.g. 127-3 = 124 = 0x0000007c
+
+        exp  = (exp + bias_difference(T)) << 23
+        sig  = sig << sig_bit_shift(T)
+        ret = sign | exp | sig
+        return reinterpret(Float32, ret)
+    end
+end
+
+sign_mask(::Type{Float32}) = 0x80000000
+exponent_mask(::Type{Float32}) = 0x7fc00000     # reinterpret(UInt32,Float32)
+significand_mask(::Type{Float32}) = 0x803fffff   # ~reinterpret(UInt32,-NaN32)
+n_exponent_bits(::Type{Float32}) = 8
+n_significant_bits(::Type{Float32}) = 23
+
+function Float8(val::Float32)
+    local ival::UInt32 = reinterpret(UInt32, val)
+
+    # seperate into sign, exponent, significand
+    local sign::UInt32 = (ival & sign_mask(Float32)) >> 31
+    local exp::UInt32  = (ival & exponent_mask(Float32)) >> n_significant_bits(Foat32)
+    local sig::UInt32  = (ival & significand_mask(Float32))
+    local ret::UInt8   # return value
+
+    if exp == zero(UInt32)
+        if sig == zero(UInt32)          # +-0 case
+            ret = sign << 7
+            return reinterpret(Float8,ret)
+        else                            # subnormals,map to Inf8, -Inf8
+            if sign == zero(UInt32)
+                return inf(Float8)
+            else
+                return -inf(Float8)
+            end
+        end
+    elseif exp == exponent_mask(Float32)        # all exponent bits == 1, Inf/NaN case
+        if sig == zero(UInt32)                  # Infinity
+            if sign == zero(UInt32)
+                return inf8(Float8)
+            else
+                return -inf8(Float8)
+            end
+        else                                    # NaN
+            return nan8(Float8)
+        end
+    else
+        sign = sign << 31
+
+        # bias = 2^(n_exp-1) - 1, i.e. 127 for Float32, 15 for Float16, 3 for Float8, 7 for Float8_4
+        # difference in bias has to be added, e.g. 127-3 = 124 = 0x0000007c
+
+        exp  = (exp + bias_difference(T)) << 23
+        sig  = sig << sig_bit_shift(T)
+        ret = sign | exp | sig
+        return reinterpret(Float32, ret)
+    end
+end
+
+round(x::T, r::RoundingMode{:ToZero}) where {T<:AbstractFloat8} = T(round(Float32(x), r))
+round(x::T, r::RoundingMode{:Down}) where {T<:AbstractFloat8} = T(round(Float32(x), r))
+round(x::T, r::RoundingMode{:Up}) where {T<:AbstractFloat8} = T(round(Float32(x), r))
+round(x::T, r::RoundingMode{:Nearest}) where {T<:AbstractFloat8} = T(round(Float32(x), r))
+
+function ==(x::AbstractFloat8, y::AbstractFloat8)
     if isnan(x) || isnan(y) # For Float16: (ix|iy)&0x7fff > 0x7c00
         return false
     end
     if iszero(x) && iszero(y) # For Float16: (ix|iy)&0x7fff == 0x0000
         return true
     end
-    ix = reinterpret(UInt8,x)
-    iy = reinterpret(UInt8,y)
-    return ix == iy
+    return x == y
 end
 
 for op in (:<, :<=, :isless)
-    @eval ($op)(a::Float8, b::Float8) = ($op)(Float32(a), Float32(b))
-end
-
-
-
-@eval begin
-    typemin(::Type{Float16}) = $(bitcast(Float16, 0xfc00))
-    typemax(::Type{Float16}) = $(Inf16)
-    typemin(x::T) where {T<:Real} = typemin(T)
-    typemax(x::T) where {T<:Real} = typemax(T)
-
-    floatmin(::Type{Float16}) = $(bitcast(Float16, 0x0400))
-    floatmax(::Type{Float16}) = $(bitcast(Float16, 0x7bff))
-
-    eps(x::AbstractFloat) = isfinite(x) ? abs(x) >= floatmin(x) ? ldexp(eps(typeof(x)), exponent(x)) : nextfloat(zero(x)) : oftype(x, NaN)
-    eps(::Type{Float16}) = $(bitcast(Float16, 0x1400))
-end
-
-for T in (Float16, Float32, Float64)
-    @eval significand_bits(::Type{$T}) = $(trailing_ones(significand_mask(T)))
-    @eval exponent_bits(::Type{$T}) = $(sizeof(T)*8 - significand_bits(T) - 1)
-    @eval exponent_bias(::Type{$T}) = $(Int(exponent_one(T) >> significand_bits(T)))
-    # maximum float exponent
-    @eval exponent_max(::Type{$T}) = $(Int(exponent_mask(T) >> significand_bits(T)) - exponent_bias(T))
-    # maximum float exponent without bias
-    @eval exponent_raw_max(::Type{$T}) = $(Int(exponent_mask(T) >> significand_bits(T)))
+    @eval ($op)(a::T, b::T) where {T<:AbstractFloat8} = ($op)(Float32(a), Float32(b))
 end
