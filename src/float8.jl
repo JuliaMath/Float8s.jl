@@ -4,6 +4,7 @@ primitive type Float8_4 <: AbstractFloat8 8 end      # version with 4 exp bits
 
 Float8(x::UInt8) = reinterpret(Float8,x)
 Float8_4(x::UInt8) = reinterpret(Float8_4,x)
+UInt8(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x)
 bitstring(x::AbstractFloat8) = bitstring(reinterpret(UInt8,x))
 
 # masks, UInt8s with 1s for the respective parts
@@ -18,6 +19,8 @@ n_exponent_bits(::Type{Float8}) = 3
 n_exponent_bits(::Type{Float8_4}) = 4
 n_significant_bits(::Type{Float8}) = 4
 n_significant_bits(::Type{Float8_4}) = 3
+bias(::Type{Float8}) = 3
+bias(::Type{Float8_4}) = 7
 
 eps(::Type{Float8}) = Float8(0x02)
 eps(::Type{Float8_4}) = Float8_4(0x20)
@@ -61,12 +64,16 @@ isfinite(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x) & exponent_mask(
 precision(::Type{Float8}) = 5
 precision(::Type{Float8_4}) = 4
 
+
+
+# Float32 -> Float8 algorithm in analogy to
+#
 # Float32 -> Float16 algorithm from:
 #   "Fast Half Float Conversion" by Jeroen van der Zijp
 #   ftp://ftp.fox-toolkit.org/pub/fasthalffloatconversion.pdf
 #
 # With adjustments for round-to-nearest, ties to even.
-#
+
 # let _basetable = Vector{UInt16}(undef, 512),
 #     _shifttable = Vector{UInt8}(undef, 512)
 #     for i = 0:255
@@ -101,33 +108,87 @@ precision(::Type{Float8_4}) = 4
 #     global const shifttable = (_shifttable...,)
 #     global const basetable = (_basetable...,)
 # end
-#
-# function Float16(val::Float32)
-#     f = reinterpret(UInt32, val)
-#     if isnan(val)
-#         t = 0x8000 ⊻ (0x8000 & ((f >> 0x10) % UInt16))
-#         return reinterpret(Float16, t ⊻ ((f >> 0xd) % UInt16))
-#     end
-#     i = ((f & ~significand_mask(Float32)) >> significand_bits(Float32)) + 1
-#     @inbounds sh = shifttable[i]
-#     f &= significand_mask(Float32)
-#     # If `val` is subnormal, the tables are set up to force the
-#     # result to 0, so the significand has an implicit `1` in the
-#     # cases we care about.
-#     f |= significand_mask(Float32) + 0x1
-#     @inbounds h = (basetable[i] + (f >> sh) & significand_mask(Float16)) % UInt16
-#     # round
-#     # NOTE: we maybe should ignore NaNs here, but the payload is
-#     # getting truncated anyway so "rounding" it might not matter
-#     nextbit = (f >> (sh-1)) & 1
-#     if nextbit != 0 && (h & 0x7C00) != 0x7C00
-#         # Round halfway to even or check lower bits
-#         if h&1 == 1 || (f & ((1<<(sh-1))-1)) != 0
-#             h += UInt16(1)
-#         end
-#     end
-#     reinterpret(Float16, h)
-# end
+
+sign_mask(::Type{Float32}) =            0x8000_0000
+exponent_mask(::Type{Float32}) =        0x7f80_0000     # reinterpret(UInt32,Float32)
+significand_mask(::Type{Float32}) =     0x007f_ffff   # ~reinterpret(UInt32,-NaN32)
+n_exponent_bits(::Type{Float32}) =      8
+n_significant_bits(::Type{Float32}) =   23
+
+function create_base_shifttable(::Type{T}) where {T<:AbstractFloat8}
+
+    basetable = Vector{UInt8}(undef, 512)
+    shifttable = Vector{UInt8}(undef, 512)
+
+    for i = 0:255                   # all possible exponents for Float32
+        e = i - 127                 # subtract Float32 bias
+        if e < -7                   # Very small numbers map to +- zero
+            basetable[i|0x000+1] = zero(T)
+            basetable[i|0x100+1] = -zero(T)
+            shifttable[i|0x000+1] = n_significant_bits(T)+1
+            shifttable[i|0x100+1] = n_significant_bits(T)+1
+        elseif e < -2               # Small numbers map to denorms
+            basetable[i|0x000+1] = zero(T)
+            basetable[i|0x100+1] = -zero(T)
+            shifttable[i|0x000+1] = -e-2
+            shifttable[i|0x100+1] = -e-2
+        elseif e < 4                # Normal numbers just lose precision
+            basetable[i|0x000+1] = ((e+bias(T)) << n_significant_bits(T))
+            basetable[i|0x100+1] = ((e+bias(T)) << n_significant_bits(T)) | sign_mask(T)
+            shifttable[i|0x000+1] = n_significant_bits(Float32)-n_significant_bits(T)
+            shifttable[i|0x100+1] = n_significant_bits(Float32)-n_significant_bits(T)
+        elseif e < 128              # Large numbers map to Infinity
+            basetable[i|0x000+1] = inf8(T)
+            basetable[i|0x100+1] = -inf8(T)
+            shifttable[i|0x000+1] = n_significant_bits(T)+1
+            shifttable[i|0x100+1] = n_significant_bits(T)+1
+        else                        # Infinity and NaN's stay Infinity and NaN's
+            basetable[i|0x000+1] = inf8(T)
+            basetable[i|0x100+1] = -inf8(T)
+            shifttable[i|0x000+1] = n_significant_bits(Float32)-n_significant_bits(T)
+            shifttable[i|0x100+1] = n_significant_bits(Float32)-n_significant_bits(T)
+        end
+    end
+
+    return basetable, shifttable
+end
+
+const basetable8, shifttable8 = create_base_shifttable(Float8)
+const basetable8_4, shifttable8_4 = create_base_shifttable(Float8_4)
+
+function Float8(val::Float32)
+
+    f = reinterpret(UInt32, val)
+
+    if isnan(val)       #TODO retain the significant bits for NaN?
+        return nan8(Float8)
+    end
+
+    # exponent as Int64
+    i = f >> n_significant_bits(Float32) + 1
+    sh = shifttable8[i]
+    f &= significand_mask(Float32)
+
+    # If `val` is subnormal, the tables are set up to force the
+    # result to 0, so the significand has an implicit `1` in the
+    # cases we care about.
+
+    f |= significand_mask(Float32) + 0x1
+    h = (basetable8[i] + (f >> sh) & significand_mask(Float8)) % UInt8
+
+    # round
+    # NOTE: we maybe should ignore NaNs here, but the payload is
+    # getting truncated anyway so "rounding" it might not matter
+
+    nextbit = (f >> (sh-1)) & 1
+    if nextbit != 0 && (h & exponent_mask(Float8)) != exponent_mask(Float8)
+        # Round halfway to even or check lower bits
+        if h&1 == 1 || (f & ((1<<(sh-1))-1)) != 0
+            h += one(UInt8)
+        end
+    end
+    return reinterpret(Float8, h)
+end
 #
 
 first_sig_bit_mask(::Type{Float8}) = 0x00000008
@@ -183,55 +244,6 @@ function Float32(val::T) where {T<:AbstractFloat8}
             # NaN32 == reinterpret(Flaot32,0x7fc00000)
             ret = 0x7fc00000 | (sign<<31) | (sig<<sig_bit_shift(T))
             reinterpret(Float32,ret)
-        end
-    else
-        sign = sign << 31
-
-        # bias = 2^(n_exp-1) - 1, i.e. 127 for Float32, 15 for Float16, 3 for Float8, 7 for Float8_4
-        # difference in bias has to be added, e.g. 127-3 = 124 = 0x0000007c
-
-        exp  = (exp + bias_difference(T)) << 23
-        sig  = sig << sig_bit_shift(T)
-        ret = sign | exp | sig
-        return reinterpret(Float32, ret)
-    end
-end
-
-sign_mask(::Type{Float32}) = 0x80000000
-exponent_mask(::Type{Float32}) = 0x7fc00000     # reinterpret(UInt32,Float32)
-significand_mask(::Type{Float32}) = 0x803fffff   # ~reinterpret(UInt32,-NaN32)
-n_exponent_bits(::Type{Float32}) = 8
-n_significant_bits(::Type{Float32}) = 23
-
-function Float8(val::Float32)
-    local ival::UInt32 = reinterpret(UInt32, val)
-
-    # seperate into sign, exponent, significand
-    local sign::UInt32 = (ival & sign_mask(Float32)) >> 31
-    local exp::UInt32  = (ival & exponent_mask(Float32)) >> n_significant_bits(Foat32)
-    local sig::UInt32  = (ival & significand_mask(Float32))
-    local ret::UInt8   # return value
-
-    if exp == zero(UInt32)
-        if sig == zero(UInt32)          # +-0 case
-            ret = sign << 7
-            return reinterpret(Float8,ret)
-        else                            # subnormals,map to Inf8, -Inf8
-            if sign == zero(UInt32)
-                return inf(Float8)
-            else
-                return -inf(Float8)
-            end
-        end
-    elseif exp == exponent_mask(Float32)        # all exponent bits == 1, Inf/NaN case
-        if sig == zero(UInt32)                  # Infinity
-            if sign == zero(UInt32)
-                return inf8(Float8)
-            else
-                return -inf8(Float8)
-            end
-        else                                    # NaN
-            return nan8(Float8)
         end
     else
         sign = sign << 31
