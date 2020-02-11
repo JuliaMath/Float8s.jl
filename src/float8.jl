@@ -2,6 +2,12 @@ abstract type AbstractFloat8 <: AbstractFloat end
 primitive type Float8 <: AbstractFloat8 8 end        # standard 3 exp version
 primitive type Float8_4 <: AbstractFloat8 8 end      # version with 4 exp bits
 
+import Base: (-),(==),(<),(<=),isless,bitstring,
+            isnan,iszero,one,zero,abs,isfinite,
+            floatmin,floatmax,typemin,typemax,
+            Float16,Float32,Float64,
+            UInt8,Int8,Int16,Int32,Int64
+
 Float8(x::UInt8) = reinterpret(Float8,x)
 Float8_4(x::UInt8) = reinterpret(Float8_4,x)
 UInt8(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x)
@@ -64,8 +70,6 @@ isfinite(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x) & exponent_mask(
 precision(::Type{Float8}) = 5
 precision(::Type{Float8_4}) = 4
 
-
-
 # Float32 -> Float8 algorithm in analogy to
 #
 # Float32 -> Float16 algorithm from:
@@ -73,41 +77,6 @@ precision(::Type{Float8_4}) = 4
 #   ftp://ftp.fox-toolkit.org/pub/fasthalffloatconversion.pdf
 #
 # With adjustments for round-to-nearest, ties to even.
-
-# let _basetable = Vector{UInt16}(undef, 512),
-#     _shifttable = Vector{UInt8}(undef, 512)
-#     for i = 0:255
-#         e = i - 127
-#         if e < -25  # Very small numbers map to zero
-#             _basetable[i|0x000+1] = 0x0000
-#             _basetable[i|0x100+1] = 0x8000
-#             _shifttable[i|0x000+1] = 25
-#             _shifttable[i|0x100+1] = 25
-#         elseif e < -14  # Small numbers map to denorms
-#             _basetable[i|0x000+1] = 0x0000
-#             _basetable[i|0x100+1] = 0x8000
-#             _shifttable[i|0x000+1] = -e-1
-#             _shifttable[i|0x100+1] = -e-1
-#         elseif e <= 15  # Normal numbers just lose precision
-#             _basetable[i|0x000+1] = ((e+15)<<10)
-#             _basetable[i|0x100+1] = ((e+15)<<10) | 0x8000
-#             _shifttable[i|0x000+1] = 13
-#             _shifttable[i|0x100+1] = 13
-#         elseif e < 128  # Large numbers map to Infinity
-#             _basetable[i|0x000+1] = 0x7C00
-#             _basetable[i|0x100+1] = 0xFC00
-#             _shifttable[i|0x000+1] = 24
-#             _shifttable[i|0x100+1] = 24
-#         else  # Infinity and NaN's stay Infinity and NaN's
-#             _basetable[i|0x000+1] = 0x7C00
-#             _basetable[i|0x100+1] = 0xFC00
-#             _shifttable[i|0x000+1] = 13
-#             _shifttable[i|0x100+1] = 13
-#         end
-#     end
-#     global const shifttable = (_shifttable...,)
-#     global const basetable = (_basetable...,)
-# end
 
 sign_mask(::Type{Float32}) =            0x8000_0000
 exponent_mask(::Type{Float32}) =        0x7f80_0000     # reinterpret(UInt32,Float32)
@@ -122,7 +91,7 @@ function create_base_shifttable(::Type{T}) where {T<:AbstractFloat8}
 
     for i = 0:255                   # all possible exponents for Float32
         e = i - 127                 # subtract Float32 bias
-        if e < -7                   # Very small numbers map to +- zero
+        if e < -6                   # Very small numbers map to +- zero
             basetable[i|0x000+1] = zero(T)
             basetable[i|0x100+1] = -zero(T)
             shifttable[i|0x000+1] = n_significant_bits(T)+1
@@ -130,8 +99,8 @@ function create_base_shifttable(::Type{T}) where {T<:AbstractFloat8}
         elseif e < -2               # Small numbers map to denorms
             basetable[i|0x000+1] = zero(T)
             basetable[i|0x100+1] = -zero(T)
-            shifttable[i|0x000+1] = -e-2
-            shifttable[i|0x100+1] = -e-2
+            shifttable[i|0x000+1] = -e+17
+            shifttable[i|0x100+1] = -e+17
         elseif e < 4                # Normal numbers just lose precision
             basetable[i|0x000+1] = ((e+bias(T)) << n_significant_bits(T))
             basetable[i|0x100+1] = ((e+bias(T)) << n_significant_bits(T)) | sign_mask(T)
@@ -153,10 +122,12 @@ function create_base_shifttable(::Type{T}) where {T<:AbstractFloat8}
     return basetable, shifttable
 end
 
-const basetable8, shifttable8 = create_base_shifttable(Float8)
-const basetable8_4, shifttable8_4 = create_base_shifttable(Float8_4)
+# const basetable8, shifttable8 = create_base_shifttable(Float8)
+# const basetable8_4, shifttable8_4 = create_base_shifttable(Float8_4)
 
 function Float8(val::Float32)
+
+    basetable8, shifttable8 = create_base_shifttable(Float8)
 
     f = reinterpret(UInt32, val)
 
@@ -176,10 +147,7 @@ function Float8(val::Float32)
     f |= significand_mask(Float32) + 0x1
     h = (basetable8[i] + (f >> sh) & significand_mask(Float8)) % UInt8
 
-    # round
-    # NOTE: we maybe should ignore NaNs here, but the payload is
-    # getting truncated anyway so "rounding" it might not matter
-
+    # rounding
     nextbit = (f >> (sh-1)) & 1
     if nextbit != 0 && (h & exponent_mask(Float8)) != exponent_mask(Float8)
         # Round halfway to even or check lower bits
@@ -189,7 +157,6 @@ function Float8(val::Float32)
     end
     return reinterpret(Float8, h)
 end
-#
 
 first_sig_bit_mask(::Type{Float8}) = 0x00000008
 first_sig_bit_mask(::Type{Float8_4}) = 0x00000004
