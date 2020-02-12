@@ -7,7 +7,36 @@
 Finally a number type that you can count with your fingers. Super Mario and Zelda would be proud.
 
 Comes in two flavours: `Float8` has 3 exponent bits and 4 fraction bits, `Float8_4` has 4 exponent bits and 3 fraction bits.
-Both rely on conversion to Float32 to perform any arithmetic operation.
+Both rely on conversion to Float32 to perform any arithmetic operation, similar to `Float16`.
+
+# Example use
+
+```julia
+julia> using .Float8s
+
+julia> a = Float8(4)
+Float8(0x50)
+
+julia> b = Float8(2)
+Float8(0x40)
+
+julia> a+b
+Float8(0x58)
+
+julia> Float32(a+b)
+6.0f0
+
+julia> Float32(sqrt(a))
+2.0f0
+```
+Most arithmetic operations are implemented. If you would like to have an additional feature, raise an [issue](https://github.com/milankl/Float8s.jl/issues).
+
+# Installation
+
+`Float8s.jl` is not yet registered, for the time being do
+```julia
+(v1.3) pkg> add https://github.com/milankl/Float8s.jl
+```
 
 # Benchmarking
 ```julia
