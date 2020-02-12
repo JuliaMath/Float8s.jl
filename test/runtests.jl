@@ -10,7 +10,7 @@ using Test
     end
 end
 
-@testset "Conversion Float8 <-> Float32" begin
+@testset "Conversion Float8_4 <-> Float32" begin
 
     for i in 0x00:0xff
         if ~isnan(Float8_4(i))
