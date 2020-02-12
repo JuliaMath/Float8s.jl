@@ -7,7 +7,7 @@ module Float8s
                 UInt8,Int8,Int16,Int32,Int64,
                 (+), (-), (*), (/), (\), (^),
                 sin,cos,tan,asin,acos,atan,sinh,cosh,tanh,asinh,acosh,
-                atanh,exp,exp2,exp10,log,log2,log10,sqrt,lgamma,log1p
+                atanh,exp,exp2,exp10,log,log2,log10,sqrt,log1p,
                 atan,hypot
 
     export Float8, Float8_4, NaN8, Inf8, NaN8_4, Inf8_4
