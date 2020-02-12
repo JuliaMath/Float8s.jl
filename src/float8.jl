@@ -2,16 +2,14 @@ abstract type AbstractFloat8 <: AbstractFloat end
 primitive type Float8 <: AbstractFloat8 8 end        # standard 3 exp version
 primitive type Float8_4 <: AbstractFloat8 8 end      # version with 4 exp bits
 
-import Base: (-),(==),(<),(<=),isless,bitstring,
-            isnan,iszero,one,zero,abs,isfinite,
-            floatmin,floatmax,typemin,typemax,
-            Float16,Float32,Float64,
-            UInt8,Int8,Int16,Int32,Int64
-
+# conversions
 Float8(x::UInt8) = reinterpret(Float8,x)
 Float8_4(x::UInt8) = reinterpret(Float8_4,x)
 UInt8(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x)
 bitstring(x::AbstractFloat8) = bitstring(reinterpret(UInt8,x))
+Float8(x::T) where {T<:Union{Int16,Int32,Int64,Float64,Float16}} = Float8(Float32(x))
+Float8_4(x::T) where {T<:Union{Int16,Int32,Int64,Float64,Float16}} = Float8_4(Float32(x))
+(::Type{T})(x::AbstractFloat8) where {T<:Union{Int16,Int32,Int64,Float64,Float16}} = T(Float32(x))
 
 # masks, UInt8s with 1s for the respective parts
 sign_mask(::Type{T}) where {T<:AbstractFloat8} = 0x80
@@ -19,6 +17,12 @@ exponent_mask(::Type{Float8}) = 0x70
 exponent_mask(::Type{Float8_4}) = 0x78
 significand_mask(::Type{Float8}) = 0x0f
 significand_mask(::Type{Float8_4}) = 0x07
+
+sign_mask(::Type{Float32}) =            0x8000_0000
+exponent_mask(::Type{Float32}) =        0x7f80_0000
+significand_mask(::Type{Float32}) =     0x007f_ffff
+n_exponent_bits(::Type{Float32}) =      8
+n_significant_bits(::Type{Float32}) =   23
 
 # number of exp/sig bits
 n_exponent_bits(::Type{Float8}) = 3
@@ -40,6 +44,9 @@ nan8(::Type{Float8_4}) = Float8_4(0x7c)
 
 const NaN8 = nan8(Float8)
 const Inf8 = inf8(Float8)
+
+const NaN8_4 = nan8(Float8_4)
+const Inf8_4 = inf8(Float8_4)
 
 typemin(::Type{T}) where {T<:AbstractFloat8} = -inf8(T)
 typemax(::Type{T}) where {T<:AbstractFloat8} = inf8(T)
@@ -78,16 +85,16 @@ precision(::Type{Float8_4}) = 4
 #
 # With adjustments for round-to-nearest, ties to even.
 
-sign_mask(::Type{Float32}) =            0x8000_0000
-exponent_mask(::Type{Float32}) =        0x7f80_0000     # reinterpret(UInt32,Float32)
-significand_mask(::Type{Float32}) =     0x007f_ffff   # ~reinterpret(UInt32,-NaN32)
-n_exponent_bits(::Type{Float32}) =      8
-n_significant_bits(::Type{Float32}) =   23
-
 function create_base_shifttable(::Type{T}) where {T<:AbstractFloat8}
 
     basetable = Vector{UInt8}(undef, 512)
     shifttable = Vector{UInt8}(undef, 512)
+
+    if T == Float8
+        e_limits = [-6,-2,4]
+    elseif T == Float8_4
+        e_limits = []
+    end
 
     for i = 0:255                   # all possible exponents for Float32
         e = i - 127                 # subtract Float32 bias
@@ -122,22 +129,26 @@ function create_base_shifttable(::Type{T}) where {T<:AbstractFloat8}
     return basetable, shifttable
 end
 
-# const basetable8, shifttable8 = create_base_shifttable(Float8)
-# const basetable8_4, shifttable8_4 = create_base_shifttable(Float8_4)
+const basetable8, shifttable8 = create_base_shifttable(Float8)
+const basetable8_4, shifttable8_4 = create_base_shifttable(Float8_4)
 
-function Float8(val::Float32)
+basetable(::Type{Float8},i::Int) = @inbounds basetable8[i]
+basetable(::Type{Float8_4},i::Int) = @inbounds basetable8_4[i]
 
-    basetable8, shifttable8 = create_base_shifttable(Float8)
+shifttable(::Type{Float8},i::Int) = @inbounds shifttable8[i]
+shifttable(::Type{Float8_4},i::Int) = @inbounds shifttable8_4[i]
+
+function (::Type{T})(val::Float32) where {T<:AbstractFloat8}
 
     f = reinterpret(UInt32, val)
 
     if isnan(val)       #TODO retain the significant bits for NaN?
-        return nan8(Float8)
+        return nan8(T)
     end
 
     # exponent as Int64
     i = f >> n_significant_bits(Float32) + 1
-    sh = shifttable8[i]
+    sh = shifttable(T,i)
     f &= significand_mask(Float32)
 
     # If `val` is subnormal, the tables are set up to force the
@@ -145,17 +156,17 @@ function Float8(val::Float32)
     # cases we care about.
 
     f |= significand_mask(Float32) + 0x1
-    h = (basetable8[i] + (f >> sh) & significand_mask(Float8)) % UInt8
+    h = (basetable(T,i) + (f >> sh) & significand_mask(T)) % UInt8
 
     # rounding
     nextbit = (f >> (sh-1)) & 1
-    if nextbit != 0 && (h & exponent_mask(Float8)) != exponent_mask(Float8)
+    if nextbit != 0 && (h & exponent_mask(T)) != exponent_mask(T)
         # Round halfway to even or check lower bits
         if h&1 == 1 || (f & ((1<<(sh-1))-1)) != 0
             h += one(UInt8)
         end
     end
-    return reinterpret(Float8, h)
+    return reinterpret(T, h)
 end
 
 first_sig_bit_mask(::Type{Float8}) = 0x00000008
@@ -164,8 +175,8 @@ first_sig_bit_mask(::Type{Float8_4}) = 0x00000004
 sig_bit_shift(::Type{Float8}) = 19          # 23 significand bits for Float32 - 4 significand bits for Float8
 sig_bit_shift(::Type{Float8_4}) = 20        # 23 significand bits for Float32 - 3 significand bits for Float8_4
 
-bias_difference(::Type{Float8}) = 0x0000007c    # = 124, 127 for Float32 minus 3 for Float 8
-bias_difference(::Type{Float8_4}) = 0x00000078    # = 120, 127 for Float32 minus 7 for Float 8_4
+bias_difference(::Type{Float8}) = 0x0000007c        # = 124, 127 for Float32 minus 3 for Float 8
+bias_difference(::Type{Float8_4}) = 0x00000078      # = 120, 127 for Float32 minus 7 for Float 8_4
 
 exp_bits_all_one(::Type{Float8}) = 0x00000007
 exp_bits_all_one(::Type{Float8_4}) = 0x0000000f
@@ -231,10 +242,10 @@ round(x::T, r::RoundingMode{:Up}) where {T<:AbstractFloat8} = T(round(Float32(x)
 round(x::T, r::RoundingMode{:Nearest}) where {T<:AbstractFloat8} = T(round(Float32(x), r))
 
 function ==(x::AbstractFloat8, y::AbstractFloat8)
-    if isnan(x) || isnan(y) # For Float16: (ix|iy)&0x7fff > 0x7c00
+    if isnan(x) || isnan(y)     # Alternatively, For Float16: (ix|iy)&0x7fff > 0x7c00
         return false
     end
-    if iszero(x) && iszero(y) # For Float16: (ix|iy)&0x7fff == 0x0000
+    if iszero(x) && iszero(y)   # For Float16: (ix|iy)&0x7fff == 0x0000
         return true
     end
     return x == y
@@ -242,4 +253,23 @@ end
 
 for op in (:<, :<=, :isless)
     @eval ($op)(a::T, b::T) where {T<:AbstractFloat8} = ($op)(Float32(a), Float32(b))
+end
+
+for op in (:+, :-, :*, :/, :\, :^)
+    @eval ($op)(a::Float8, b::Float8) = Float8(($op)(Float32(a), Float32(b)))
+end
+
+for func in (:sin,:cos,:tan,:asin,:acos,:atan,:sinh,:cosh,:tanh,:asinh,:acosh,
+             :atanh,:exp,:exp2,:exp10,:log,:log2,:log10,:sqrt,:lgamma,:log1p)
+    @eval begin
+        $func(a::Float8) = Float8($func(Float32(a)))
+        $func(a::Float8_4) = Float8_4($func(Float32(a)))
+    end
+end
+
+for func in (:atan,:hypot)
+    @eval begin
+        $func(a::Float8,b::Float8) = Float8($func(Float32(a),Float32(b)))
+        $func(a::Float8_4,b::Float8_4) = Float8_4($func(Float32(a),Float32(b)))
+    end
 end
