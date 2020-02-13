@@ -8,7 +8,8 @@ module Float8s
                 (+), (-), (*), (/), (\), (^),
                 sin,cos,tan,asin,acos,atan,sinh,cosh,tanh,asinh,acosh,
                 atanh,exp,exp2,exp10,log,log2,log10,sqrt,log1p,
-                atan,hypot
+                atan,hypot,
+                round
 
     export Float8, Float8_4, NaN8, Inf8, NaN8_4, Inf8_4
 
