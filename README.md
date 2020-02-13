@@ -50,11 +50,14 @@ julia> @btime Float32.($A);
 julia> 413.303/300^2*1000
 4.592255555555555
 ```
-Conversions from Float8 to Float32 take about 4.5ns (table-driven), conversions in the other direction are about 2x slower (lookup tables could probably improve the performance though). 
+Conversions from Float8 to Float32 take about 4.5ns, conversions in the other direction are about 2x slower and slightly slower than for `Float16`. 
 ```julia
-julia> B = randn(Float32,300,300);
+julia> A = Float32.(randn(300,300));
 
-julia> @btime Float8.($B);
-  922.728 μs (2 allocations: 88.02 KiB)
+julia> @btime Float16.($A);
+  674.123 μs (2 allocations: 175.89 KiB)
+
+julia> @btime Float8.($A);
+  955.196 μs (2 allocations: 88.02 KiB)
  ```
  
