@@ -132,7 +132,6 @@ end
     @test !isnan(-Inf8)
     @test !isnan(Float8(2.6))
     @test NaN8 != NaN8
-    @test repr(NaN8) == "NaN8"
 
     @test isinf(Inf8)
     @test isinf(-Inf8)
@@ -142,7 +141,6 @@ end
     @test Inf8 == Inf8
     @test Inf8 != -Inf8
     @test -Inf8 < Inf8
-    @test repr(Inf8) == "Inf8"
 end
 
 @testset "NaN8_4 and Inf8_4" begin
@@ -152,7 +150,6 @@ end
     @test !isnan(-Inf8_4)
     @test !isnan(Float8(2.6))
     @test NaN8_4 != NaN8_4
-    @test repr(NaN8_4) == "NaN8_4"
 
     @test isinf(Inf8_4)
     @test isinf(-Inf8_4)
@@ -162,5 +159,4 @@ end
     @test Inf8_4 == Inf8_4
     @test Inf8_4 != -Inf8_4
     @test -Inf8_4 < Inf8_4
-    @test repr(Inf8_4) == "Inf8_4"
 end
