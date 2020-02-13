@@ -1,4 +1,4 @@
-using .Float8s
+using Float8s
 using Test
 
 @testset "Conversion Float8 <-> Float32" begin
