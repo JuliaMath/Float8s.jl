@@ -12,22 +12,22 @@ Both rely on conversion to Float32 to perform any arithmetic operation, similar 
 # Example use
 
 ```julia
-julia> using .Float8s
+julia> using Float8s
 
 julia> a = Float8(4)
-Float8(0x50)
+Float8(4.0)
 
-julia> b = Float8(2)
-Float8(0x40)
+julia> b = Float8(3.14159)
+Float8(3.125)
 
 julia> a+b
-Float8(0x58)
+Float8(7.0)
 
-julia> Float32(a+b)
-6.0f0
+julia> sqrt(a)
+Float8(2.0)
 
-julia> Float32(sqrt(a))
-2.0f0
+julia> a^2
+Inf8
 ```
 Most arithmetic operations are implemented. If you would like to have an additional feature, raise an [issue](https://github.com/milankl/Float8s.jl/issues).
 
