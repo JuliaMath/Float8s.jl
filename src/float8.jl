@@ -149,23 +149,17 @@ end
 const basetable8, shifttable8 = create_base_shifttable(Float8)
 const basetable8_4, shifttable8_4 = create_base_shifttable(Float8_4)
 
-basetable(::Type{Float8},i::Int) = @inbounds basetable8[i]
-basetable(::Type{Float8_4},i::Int) = @inbounds basetable8_4[i]
-
-shifttable(::Type{Float8},i::Int) = @inbounds shifttable8[i]
-shifttable(::Type{Float8_4},i::Int) = @inbounds shifttable8_4[i]
-
-function (::Type{T})(val::Float32) where {T<:AbstractFloat8}
+function Float8(val::Float32)
 
     f = reinterpret(UInt32, val)
 
     if isnan(val)       #TODO retain the significant bits for NaN?
-        return nan8(T)
+        return nan8(Float8)
     end
 
     # exponent as Int64
     i = f >> n_significant_bits(Float32) + 1
-    sh = shifttable(T,i)
+    @inbounds sh = shifttable8[i]
     f &= significand_mask(Float32)
 
     # If `val` is subnormal, the tables are set up to force the
@@ -173,17 +167,48 @@ function (::Type{T})(val::Float32) where {T<:AbstractFloat8}
     # cases we care about.
 
     f |= significand_mask(Float32) + 0x1
-    h = (basetable(T,i) + (f >> sh) & significand_mask(T)) % UInt8
+    @inbounds h = (basetable8[i] + (f >> sh) & significand_mask(Float8)) % UInt8
 
     # rounding
     nextbit = (f >> (sh-1)) & 1
-    if nextbit != 0 && (h & exponent_mask(T)) != exponent_mask(T)
+    if nextbit != 0 && (h & exponent_mask(Float8)) != exponent_mask(Float8)
         # Round halfway to even or check lower bits
         if h&1 == 1 || (f & ((1<<(sh-1))-1)) != 0
             h += one(UInt8)
         end
     end
-    return reinterpret(T, h)
+    return reinterpret(Float8, h)
+end
+
+function Float8_4(val::Float32)
+
+    f = reinterpret(UInt32, val)
+
+    if isnan(val)       #TODO retain the significant bits for NaN?
+        return nan8(Float8_4)
+    end
+
+    # exponent as Int64
+    i = f >> n_significant_bits(Float32) + 1
+    @inbounds sh = shifttable8_4[i]
+    f &= significand_mask(Float32)
+
+    # If `val` is subnormal, the tables are set up to force the
+    # result to 0, so the significand has an implicit `1` in the
+    # cases we care about.
+
+    f |= significand_mask(Float32) + 0x1
+    @inbounds h = (basetable8_4[i] + (f >> sh) & significand_mask(Float8_4)) % UInt8
+
+    # rounding
+    nextbit = (f >> (sh-1)) & 1
+    if nextbit != 0 && (h & exponent_mask(Float8_4)) != exponent_mask(Float8_4)
+        # Round halfway to even or check lower bits
+        if h&1 == 1 || (f & ((1<<(sh-1))-1)) != 0
+            h += one(UInt8)
+        end
+    end
+    return reinterpret(Float8_4, h)
 end
 
 first_sig_bit_mask(::Type{Float8}) = 0x00000008
@@ -265,7 +290,7 @@ function ==(x::AbstractFloat8, y::AbstractFloat8)
     if iszero(x) && iszero(y)   # For Float16: (ix|iy)&0x7fff == 0x0000
         return true
     end
-    return x == y
+    return reinterpret(UInt8,x) == reinterpret(UInt8,y)
 end
 
 for op in (:<, :<=, :isless)
@@ -274,6 +299,7 @@ end
 
 for op in (:+, :-, :*, :/, :\, :^)
     @eval ($op)(a::Float8, b::Float8) = Float8(($op)(Float32(a), Float32(b)))
+    @eval ($op)(a::Float8_4, b::Float8_4) = Float8_4(($op)(Float32(a), Float32(b)))
 end
 
 for func in (:sin,:cos,:tan,:asin,:acos,:atan,:sinh,:cosh,:tanh,:asinh,:acosh,
@@ -288,5 +314,31 @@ for func in (:atan,:hypot)
     @eval begin
         $func(a::Float8,b::Float8) = Float8($func(Float32(a),Float32(b)))
         $func(a::Float8_4,b::Float8_4) = Float8_4($func(Float32(a),Float32(b)))
+    end
+end
+
+function show(io::IO,x::Float8)
+    if isnan(x)
+        print(io,"NaN8")
+    elseif isinf(x)
+        print(io,"Inf8")
+    else
+        io2 = IOBuffer()
+        print(io2,Float32(x))
+        f = String(take!(io2))
+        print(io,"Float8("*f*")")
+    end
+end
+
+function show(io::IO,x::Float8_4)
+    if isnan(x)
+        print(io,"NaN8_4")
+    elseif isinf(x)
+        print(io,"Inf8_4")
+    else
+        io2 = IOBuffer()
+        print(io2,Float32(x))
+        f = String(take!(io2))
+        print(io,"Float8_4("*f*")")
     end
 end
