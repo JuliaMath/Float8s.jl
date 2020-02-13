@@ -130,7 +130,7 @@ end
     @test isnan(-NaN8)
     @test !isnan(Inf8)
     @test !isnan(-Inf8)
-    @test !isnan(Float16(2.6))
+    @test !isnan(Float8(2.6))
     @test NaN8 != NaN8
     @test repr(NaN8) == "NaN8"
 
@@ -138,7 +138,7 @@ end
     @test isinf(-Inf8)
     @test !isinf(NaN8)
     @test !isinf(-NaN8)
-    @test !isinf(Float16(2.6))
+    @test !isinf(Float8(2.6))
     @test Inf8 == Inf8
     @test Inf8 != -Inf8
     @test -Inf8 < Inf8
