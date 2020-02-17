@@ -303,7 +303,7 @@ for op in (:+, :-, :*, :/, :\, :^)
 end
 
 for func in (:sin,:cos,:tan,:asin,:acos,:atan,:sinh,:cosh,:tanh,:asinh,:acosh,
-             :atanh,:exp,:exp2,:exp10,:log,:log2,:log10,:sqrt,:lgamma,:log1p)
+             :atanh,:exp,:exp2,:exp10,:expm1,:log,:log2,:log10,:sqrt,:cbrt,:lgamma,:log1p)
     @eval begin
         $func(a::Float8) = Float8($func(Float32(a)))
         $func(a::Float8_4) = Float8_4($func(Float32(a)))
@@ -340,5 +340,23 @@ function show(io::IO,x::Float8_4)
         print(io2,Float32(x))
         f = String(take!(io2))
         print(io,"Float8_4("*f*")")
+    end
+end
+
+function nextfloat(x::T) where {T<:AbstractFloat8}
+    if isnan(x) || isinf(x)
+        return x
+    else
+        return T(UInt8(x)+0x1)
+    end
+end
+
+function prevfloat(x::T) where {T<:AbstractFloat8}
+    if isnan(x) || x == -inf8(T)
+        return x
+    elseif x == zero(T)
+        return T(0x81)
+    else
+        return T(UInt8(x)-0x1)
     end
 end
