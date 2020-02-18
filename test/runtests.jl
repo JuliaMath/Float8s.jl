@@ -160,3 +160,87 @@ end
     @test Inf8_4 != -Inf8_4
     @test -Inf8_4 < Inf8_4
 end
+
+@testset "Nextfloat" begin
+    for i in 0x00:0x7f      # positive numbers
+
+        f = Float8(i)
+        if isfinite(f)
+            @test f < nextfloat(f)
+            @test 0x1 == UInt8(nextfloat(f))-i
+        end
+
+        f = Float8_4(i)
+        if isfinite(f)
+            @test f < nextfloat(f)
+            @test 0x1 == UInt8(nextfloat(f))-i
+        end
+    end
+
+    for i in 0x80:0xff      # negative numbers
+        f = Float8(i)
+        if isfinite(f)
+            @test f > nextfloat(f)
+            @test 0x1 == UInt8(nextfloat(f))-i
+        end
+
+        f = Float8_4(i)
+        if isfinite(f)
+            @test f > nextfloat(f)
+            @test 0x1 == UInt8(nextfloat(f))-i
+        end
+    end
+
+    @test NaN8 != nextfloat(NaN8)
+    @test Inf8 == nextfloat(Inf8)
+    @test -Inf8 == nextfloat(-Inf8)
+
+    @test NaN8_4 != nextfloat(NaN8_4)
+    @test Inf8_4 == nextfloat(Inf8_4)
+    @test -Inf8_4 == nextfloat(-Inf8_4)
+end
+
+@testset "Prevfloat" begin
+    for i in 0x01:0x7f      # positive numbers
+
+        f = Float8(i)
+        if isfinite(f)
+            @test f > prevfloat(f)
+            @test 0x1 == i-UInt8(prevfloat(f))
+        end
+
+        f = Float8_4(i)
+        if isfinite(f)
+            @test f > prevfloat(f)
+            @test 0x1 == i-UInt8(prevfloat(f))
+        end
+    end
+
+    for i in 0x81:0xff      # negative numbers
+        f = Float8(i)
+        if isfinite(f)
+            @test f < prevfloat(f)
+            @test 0x1 == i-UInt8(prevfloat(f))
+        end
+
+        f = Float8_4(i)
+        if isfinite(f)
+            @test f < prevfloat(f)
+            @test 0x1 == i-UInt8(prevfloat(f))
+        end
+    end
+
+    @test NaN8 != prevfloat(NaN8)
+    @test Inf8 > prevfloat(Inf8)
+    @test NaN8_4 != prevfloat(NaN8_4)
+    @test Inf8_4 > prevfloat(Inf8_4)
+
+    @test -zero(Float8) > prevfloat(-zero(Float8))
+    @test -zero(Float8_4) > prevfloat(-zero(Float8_4))
+
+    @test zero(Float8) > prevfloat(zero(Float8))
+    @test zero(Float8_4) > prevfloat(zero(Float8_4))
+
+    @test -Inf8 == prevfloat(-Inf8)
+    @test -Inf8_4 == prevfloat(-Inf8_4)
+end
