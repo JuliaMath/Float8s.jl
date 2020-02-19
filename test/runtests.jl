@@ -162,71 +162,43 @@ end
 end
 
 @testset "Nextfloat" begin
-    for i in 0x00:0x7f      # positive numbers
+    for i in 0x00:0xff
 
         f = Float8(i)
         if isfinite(f)
             @test f < nextfloat(f)
-            @test 0x1 == UInt8(nextfloat(f))-i
+            #@test 0x1 == UInt8(nextfloat(f))-i     # this is only true for positive numbers
         end
 
         f = Float8_4(i)
         if isfinite(f)
             @test f < nextfloat(f)
-            @test 0x1 == UInt8(nextfloat(f))-i
-        end
-    end
-
-    for i in 0x80:0xff      # negative numbers
-        f = Float8(i)
-        if isfinite(f)
-            @test f > nextfloat(f)
-            @test 0x1 == UInt8(nextfloat(f))-i
-        end
-
-        f = Float8_4(i)
-        if isfinite(f)
-            @test f > nextfloat(f)
-            @test 0x1 == UInt8(nextfloat(f))-i
+            #@test 0x1 == UInt8(nextfloat(f))-i     # this is only true for positive numbers
         end
     end
 
     @test NaN8 != nextfloat(NaN8)
     @test Inf8 == nextfloat(Inf8)
-    @test -Inf8 == nextfloat(-Inf8)
+    @test -floatmax(Float8) == nextfloat(-Inf8)
 
     @test NaN8_4 != nextfloat(NaN8_4)
     @test Inf8_4 == nextfloat(Inf8_4)
-    @test -Inf8_4 == nextfloat(-Inf8_4)
+    @test -floatmax(Float8_4) == nextfloat(-Inf8_4)
 end
 
 @testset "Prevfloat" begin
-    for i in 0x01:0x7f      # positive numbers
+    for i in 0x00:0xff
 
         f = Float8(i)
         if isfinite(f)
             @test f > prevfloat(f)
-            @test 0x1 == i-UInt8(prevfloat(f))
+            # @test 0x1 == i-UInt8(prevfloat(f))    # this is only true for positive numbers
         end
 
         f = Float8_4(i)
         if isfinite(f)
             @test f > prevfloat(f)
-            @test 0x1 == i-UInt8(prevfloat(f))
-        end
-    end
-
-    for i in 0x81:0xff      # negative numbers
-        f = Float8(i)
-        if isfinite(f)
-            @test f < prevfloat(f)
-            @test 0x1 == i-UInt8(prevfloat(f))
-        end
-
-        f = Float8_4(i)
-        if isfinite(f)
-            @test f < prevfloat(f)
-            @test 0x1 == i-UInt8(prevfloat(f))
+            # @test 0x1 == i-UInt8(prevfloat(f))    # this is only true for positive numbers
         end
     end
 
@@ -241,6 +213,66 @@ end
     @test zero(Float8) > prevfloat(zero(Float8))
     @test zero(Float8_4) > prevfloat(zero(Float8_4))
 
+    @test prevfloat(zero(Float8)) == prevfloat(-zero(Float8))
+    @test prevfloat(zero(Float8_4)) == prevfloat(-zero(Float8_4))
+
     @test -Inf8 == prevfloat(-Inf8)
     @test -Inf8_4 == prevfloat(-Inf8_4)
+end
+
+@testset "Signbit" begin
+
+    for i in 0x00:0x7f      # positive numbers
+        @test ~signbit(Float8(i))
+        @test ~signbit(Float8_4(i))
+    end
+
+    for i in 0x80:0xff      # positive numbers
+        @test signbit(Float8(i))
+        @test signbit(Float8_4(i))
+    end
+
+end
+
+@testset "Sign" begin
+
+    for i in 0x01:0x7f
+
+        f = Float8(i)
+        if isnan(f)
+            @test UInt8(f) == UInt8(sign(f))    # NaN == NaN yields false but the bitpattern are identical
+        else
+            @test one(f) == sign(f)
+        end
+
+        f = Float8_4(i)
+        if isnan(f)
+            @test UInt8(f) == UInt8(sign(f))    # NaN == NaN yields false but the bitpattern are identical
+        else
+            @test one(f) == sign(f)
+        end
+    end
+
+    for i in 0x81:0xff
+
+        f = Float8(i)
+        if isnan(f)
+            @test UInt8(f) == UInt8(sign(f))    # NaN == NaN yields false but the bitpattern are identical
+        else
+            @test -one(f) == sign(f)
+        end
+
+        f = Float8_4(i)
+        if isnan(f)
+            @test UInt8(f) == UInt8(sign(f))    # NaN == NaN yields false but the bitpattern are identical
+        else
+            @test -one(f) == sign(f)
+        end
+    end
+
+    @test zero(Float8) == sign(zero(Float8))
+    @test zero(Float8_4) == sign(zero(Float8_4))
+
+    @test -zero(Float8) == sign(-zero(Float8))
+    @test -zero(Float8_4) == sign(-zero(Float8_4))
 end
