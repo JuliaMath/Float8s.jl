@@ -77,6 +77,18 @@ isfinite(x::T) where {T<:AbstractFloat8} = reinterpret(UInt8,x) & exponent_mask(
 precision(::Type{Float8}) = 5
 precision(::Type{Float8_4}) = 4
 
+signbit(x::AbstractFloat8) = UInt8(x) > 0x7f
+
+function sign(x::T) where {T<:AbstractFloat8}
+    if isnan(x) || iszero(x)
+        return x
+    elseif signbit(x)
+        return -one(T)
+    else
+        return one(T)
+    end
+end
+
 # Float32 -> Float8 algorithm in analogy to
 #
 # Float32 -> Float16 algorithm from:
@@ -321,7 +333,11 @@ function show(io::IO,x::Float8)
     if isnan(x)
         print(io,"NaN8")
     elseif isinf(x)
-        print(io,"Inf8")
+        if UInt8(x) > 0x80  # is negative?
+            print(io,"-Inf8")
+        else
+            print(io,"Inf8")
+        end
     else
         io2 = IOBuffer()
         print(io2,Float32(x))
@@ -334,7 +350,11 @@ function show(io::IO,x::Float8_4)
     if isnan(x)
         print(io,"NaN8_4")
     elseif isinf(x)
-        print(io,"Inf8_4")
+        if UInt8(x) > 0x80  # is negative?
+            print(io,"-Inf8_4")
+        else
+            print(io,"Inf8_4")
+        end
     else
         io2 = IOBuffer()
         print(io2,Float32(x))
@@ -344,10 +364,14 @@ function show(io::IO,x::Float8_4)
 end
 
 function nextfloat(x::T) where {T<:AbstractFloat8}
-    if isnan(x) || isinf(x)
+    if isnan(x) || x == inf8(T)
         return x
-    else
+    elseif x == -zero(T)
+        return T(0x01)
+    elseif UInt8(x) < 0x80  # positive numbers
         return T(UInt8(x)+0x1)
+    else                    # negative numbers
+        return T(UInt8(x)-0x1)
     end
 end
 
@@ -356,7 +380,29 @@ function prevfloat(x::T) where {T<:AbstractFloat8}
         return x
     elseif x == zero(T)
         return T(0x81)
-    else
+    elseif UInt8(x) < 0x80
         return T(UInt8(x)-0x1)
+    else
+        return T(UInt8(x)+0x1)
     end
 end
+
+promote_rule(::Type{Float8}, ::Type{Float64}) = Float64
+promote_rule(::Type{Float8}, ::Type{Float32}) = Float32
+promote_rule(::Type{Float8}, ::Type{Float16}) = Float16
+
+promote_rule(::Type{Float8}, ::Type{Int64}) = Float8
+promote_rule(::Type{Float8}, ::Type{Int32}) = Float8
+promote_rule(::Type{Float8}, ::Type{Int16}) = Float8
+
+promote_rule(::Type{Float8}, ::Type{Bool}) = Float8
+
+promote_rule(::Type{Float8_4}, ::Type{Float64}) = Float64
+promote_rule(::Type{Float8_4}, ::Type{Float32}) = Float32
+promote_rule(::Type{Float8_4}, ::Type{Float16}) = Float16
+
+promote_rule(::Type{Float8_4}, ::Type{Int64}) = Float8
+promote_rule(::Type{Float8_4}, ::Type{Int32}) = Float8
+promote_rule(::Type{Float8_4}, ::Type{Int16}) = Float8
+
+promote_rule(::Type{Float8_4}, ::Type{Bool}) = Float8
