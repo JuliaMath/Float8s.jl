@@ -33,9 +33,9 @@ Most arithmetic operations are implemented. If you would like to have an additio
 
 # Installation
 
-`Float8s.jl` is not yet registered, for the time being do
+`Float8s.jl` is registered, just do
 ```julia
-(v1.3) pkg> add https://github.com/milankl/Float8s.jl
+(v1.3) pkg> add Float8s
 ```
 
 # Benchmarking
