@@ -39,25 +39,22 @@ Most arithmetic operations are implemented. If you would like to have an additio
 ```
 
 # Benchmarking
+Conversions from Float8 to Float32 take about 1.5ns, about 2x faster than for conversions from `Float16` thanks to table lookups.
 ```julia
-julia> using BenchmarkTools
-
+julia> using Float8s, BenchmarkTools
 julia> A = Float8.(randn(300,300));
-
+julia> B = Float16.(randn(300,300));
 julia> @btime Float32.($A);
-  413.303 μs (2 allocations: 351.64 KiB)
-
-julia> 413.303/300^2*1000
-4.592255555555555
+  133.060 μs (2 allocations: 351.64 KiB)
+julia> @btime Float32.($B);
+  232.701 μs (2 allocations: 351.64 KiB)
 ```
-Conversions from Float8 to Float32 take about 4.5ns, conversions in the other direction are about 2x slower and slightly slower than for `Float16`. 
+ Conversions in the other direction are about 6-7x slower and slightly slower than for `Float16`. 
 ```julia
-julia> A = Float32.(randn(300,300));
-
-julia> @btime Float16.($A);
-  674.123 μs (2 allocations: 175.89 KiB)
-
-julia> @btime Float8.($A);
-  955.196 μs (2 allocations: 88.02 KiB)
+julia> C = Float32.(randn(300,300));
+julia> @btime Float16.($C);
+  672.419 μs (2 allocations: 175.89 KiB)
+julia> @btime Float8.($C);
+  873.585 μs (2 allocations: 88.02 KiB) 
  ```
  
