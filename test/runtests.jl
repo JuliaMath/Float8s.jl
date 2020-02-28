@@ -1,6 +1,72 @@
 using Float8s
 using Test
 
+@testset "Float8 -> Float32 ordered?" begin
+    @testset for i in 0x00:UInt8(floatmax(Float8))
+        f1 = Float32(Float8(i))
+        f2 = Float32(Float8(i+0x1))
+        @test f2 > f1
+    end
+
+    @testset for i in 0x80:UInt8(-floatmax(Float8))
+        f1 = Float32(Float8(i))
+        f2 = Float32(Float8(i+0x1))
+        @test f2 < f1
+    end
+end
+
+@testset "Float8_4 -> Float32 ordered?" begin
+    @testset for i in 0x00:UInt8(floatmax(Float8_4))
+        f1 = Float32(Float8_4(i))
+        f2 = Float32(Float8_4(i+0x1))
+        @test f2 > f1
+    end
+
+    @testset for i in 0x80:UInt8(-floatmax(Float8_4))
+        f1 = Float32(Float8_4(i))
+        f2 = Float32(Float8_4(i+0x1))
+        @test f2 < f1
+    end
+end
+
+@testset "Float32 -> Float8 non-subnormals ordered?" begin
+
+    N = 100
+
+    fs = (Float32(floatmax(Float8))-Float32(floatmin(Float8)))*rand(Float32,N) .+ Float32(floatmin(Float8))
+    sort!(fs)
+
+    f8s = Float8.(fs)
+    @testset for i in 1:N-1
+        @test f8s[i+1] >= f8s[i]
+    end
+
+    f8s = Float8.(-fs)
+    @testset for i in 1:N-1
+        @test f8s[i+1] <= f8s[i]
+    end
+end
+
+# CURRENTLY FAILING
+# @testset "Float32 -> Float8 subnormals ordered?" begin
+#
+#     N = 100
+#
+#     fs = Float32(floatmin(Float8))*rand(Float32,N)
+#     sort!(fs)
+#
+#     f8s = Float8.(fs)
+#     @testset for i in 1:N-1
+#         @test f8s[i+1] >= f8s[i]
+#     end
+#
+#     f8s = Float8.(-fs)
+#     @testset for i in 1:N-1
+#         @test f8s[i+1] <= f8s[i]
+#     end
+# end
+
+
 @testset "Conversion Float8 <-> Float32" begin
 
     @testset for i in 0x00:0xff
