@@ -39,7 +39,7 @@ Most arithmetic operations are implemented. If you would like to have an additio
 ```
 
 # Benchmarking
-Conversions from Float8 to Float32 take about 1.5ns, about 2x faster than for conversions from `Float16` thanks to table lookups.
+Conversions from `Float8` (same for `Float8_4`) to `Float32` take about 1.5ns, about 2x faster than for conversions from `Float16` thanks to table lookups.
 ```julia
 julia> using Float8s, BenchmarkTools
 julia> A = Float8.(randn(300,300));
