@@ -9,6 +9,8 @@ Finally a number type that you can count with your fingers. Super Mario and Zeld
 Comes in two flavours: `Float8` has 3 exponent bits and 4 fraction bits, `Float8_4` has 4 exponent bits and 3 fraction bits.
 Both rely on conversion to Float32 to perform any arithmetic operation, similar to `Float16`.
 
+CAUTION: `Float8_4(::Float32)` currently contains a bug for subnormals.
+
 # Example use
 
 ```julia
