@@ -14,5 +14,8 @@ module Float8s
     export Float8, Float8_4, NaN8, Inf8, NaN8_4, Inf8_4
 
     include("float8.jl")
+    include("float8_to_float32.jl")
+    include("float32_to_float8.jl")
+    include("float32_to_float8_old.jl")
 
 end

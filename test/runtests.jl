@@ -47,24 +47,23 @@ end
     end
 end
 
-# CURRENTLY FAILING
-# @testset "Float32 -> Float8 subnormals ordered?" begin
-#
-#     N = 100
-#
-#     fs = Float32(floatmin(Float8))*rand(Float32,N)
-#     sort!(fs)
-#
-#     f8s = Float8.(fs)
-#     @testset for i in 1:N-1
-#         @test f8s[i+1] >= f8s[i]
-#     end
-#
-#     f8s = Float8.(-fs)
-#     @testset for i in 1:N-1
-#         @test f8s[i+1] <= f8s[i]
-#     end
-# end
+@testset "Float32 -> Float8 subnormals ordered?" begin
+
+    N = 100
+
+    fs = Float32(floatmin(Float8))*rand(Float32,N)
+    sort!(fs)
+
+    f8s = Float8.(fs)
+    @testset for i in 1:N-1
+        @test f8s[i+1] >= f8s[i]
+    end
+
+    f8s = Float8.(-fs)
+    @testset for i in 1:N-1
+        @test f8s[i+1] <= f8s[i]
+    end
+end
 
 
 @testset "Conversion Float8 <-> Float32" begin
@@ -76,14 +75,15 @@ end
     end
 end
 
-@testset "Conversion Float8_4 <-> Float32" begin
-
-    @testset for i in 0x00:0xff
-        if ~isnan(Float8_4(i))
-            @test i == reinterpret(UInt8,Float8_4(Float32(Float8_4(i))))
-        end
-    end
-end
+# Currently not implemented
+# @testset "Conversion Float8_4 <-> Float32" begin
+#
+#     @testset for i in 0x00:0xff
+#         if ~isnan(Float8_4(i))
+#             @test i == reinterpret(UInt8,Float8_4(Float32(Float8_4(i))))
+#         end
+#     end
+# end
 
 @testset "Negation" begin
 
