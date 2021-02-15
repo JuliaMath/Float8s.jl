@@ -140,7 +140,7 @@ for func in (:atan,:hypot)
     end
 end
 
-function show(io::IO,x::Float8)
+function Base.show(io::IO,x::Float8)
     if isnan(x)
         print(io,"NaN8")
     elseif isinf(x)
@@ -157,7 +157,7 @@ function show(io::IO,x::Float8)
     end
 end
 
-function show(io::IO,x::Float8_4)
+function Base.show(io::IO,x::Float8_4)
     if isnan(x)
         print(io,"NaN8_4")
     elseif isinf(x)
