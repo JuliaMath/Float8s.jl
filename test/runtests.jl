@@ -342,3 +342,13 @@ end
     @test -zero(Float8) == sign(-zero(Float8))
     @test -zero(Float8_4) == sign(-zero(Float8_4))
 end
+
+@testset "Promotion" begin
+    @test Float8(2)*Float16(2) == Float16(4)
+    @test Float8(2)*Float32(2) == Float32(4)
+    @test Float8(2)*Float64(2) == Float64(4)
+
+    @test true*Float8(2) == Float8(2)
+    @test false*Float8(2) == zero(Float8)
+    @test 2*Float8(2) == Float8(4)
+end
