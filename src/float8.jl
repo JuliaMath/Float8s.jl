@@ -198,22 +198,12 @@ function prevfloat(x::T) where {T<:AbstractFloat8}
     end
 end
 
-promote_rule(::Type{Float8}, ::Type{Float64}) = Float64
-promote_rule(::Type{Float8}, ::Type{Float32}) = Float32
-promote_rule(::Type{Float8}, ::Type{Float16}) = Float16
+Base.promote_rule(::Type{Float8},::Type{Float16}) = Float16
+Base.promote_rule(::Type{Float8},::Type{Float32}) = Float32
+Base.promote_rule(::Type{Float8},::Type{Float64}) = Float64
+Base.promote_rule(::Type{Float8},::Type{<:Integer}) = Float8
 
-promote_rule(::Type{Float8}, ::Type{Int64}) = Float8
-promote_rule(::Type{Float8}, ::Type{Int32}) = Float8
-promote_rule(::Type{Float8}, ::Type{Int16}) = Float8
-
-promote_rule(::Type{Float8}, ::Type{Bool}) = Float8
-
-promote_rule(::Type{Float8_4}, ::Type{Float64}) = Float64
-promote_rule(::Type{Float8_4}, ::Type{Float32}) = Float32
-promote_rule(::Type{Float8_4}, ::Type{Float16}) = Float16
-
-promote_rule(::Type{Float8_4}, ::Type{Int64}) = Float8
-promote_rule(::Type{Float8_4}, ::Type{Int32}) = Float8
-promote_rule(::Type{Float8_4}, ::Type{Int16}) = Float8
-
-promote_rule(::Type{Float8_4}, ::Type{Bool}) = Float8
+Base.promote_rule(::Type{Float8_4},::Type{Float16}) = Float16
+Base.promote_rule(::Type{Float8_4},::Type{Float32}) = Float32
+Base.promote_rule(::Type{Float8_4},::Type{Float64}) = Float64
+Base.promote_rule(::Type{Float8_4},::Type{<:Integer}) = Float8_4
