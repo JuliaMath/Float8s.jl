@@ -34,26 +34,13 @@ Most arithmetic operations are implemented. If you would like to have an additio
 
 `Float8s.jl` is registered, just do
 ```julia
-(v1.3) pkg> add Float8s
+pkg> add Float8s
 ```
 
-# Benchmarking
-Conversions from `Float8` (same for `Float8_4`) to `Float32` take about 1.5ns, about 2x faster than for conversions from `Float16` thanks to table lookups.
-```julia
-julia> using Float8s, BenchmarkTools
-julia> A = Float8.(randn(300,300));
-julia> B = Float16.(randn(300,300));
-julia> @btime Float32.($A);
-  133.060 μs (2 allocations: 351.64 KiB)
-julia> @btime Float32.($B);
-  232.701 μs (2 allocations: 351.64 KiB)
-```
- Conversions in the other direction are about 6-7x slower and slightly slower than for `Float16`. 
-```julia
-julia> C = Float32.(randn(300,300));
-julia> @btime Float16.($C);
-  672.419 μs (2 allocations: 175.89 KiB)
-julia> @btime Float8.($C);
-  873.585 μs (2 allocations: 88.02 KiB) 
- ```
- 
+# Citation
+
+This package was written for the following publication
+
+> Klöwer M, PD Düben and TN Palmer, 2020. *Number formats, error mitigation and scope for 16-bit arithmetics in weather and climate modelling analyzed with a shallow water model*, __Journal of Advances in Modeling Earth Systems__, 12, e2020MS002246. doi: [10.1029/2020MS002246](https://doi.org/10.1029/2020MS002246)
+
+If you use this package in your own research, please cite us.
