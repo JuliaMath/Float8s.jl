@@ -250,6 +250,8 @@ end
     @test NaN8_4 != nextfloat(NaN8_4)
     @test Inf8_4 == nextfloat(Inf8_4)
     @test -floatmax(Float8_4) == nextfloat(-Inf8_4)
+
+    @test eps(Float8) == nextfloat(Float8(1)) - Float8(1)
 end
 
 @testset "Prevfloat" begin
