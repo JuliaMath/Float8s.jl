@@ -251,7 +251,10 @@ end
     @test Inf8_4 == nextfloat(Inf8_4)
     @test -floatmax(Float8_4) == nextfloat(-Inf8_4)
 
-    @test eps(Float8) == nextfloat(Float8(1)) - Float8(1)
+    for T in (Float8, Float8_4)
+        @test eps(T) == nextfloat(T(1)) - T(1)
+        @test eps(one(T)) == eps(T)
+    end
 end
 
 @testset "Prevfloat" begin

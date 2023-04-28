@@ -32,8 +32,8 @@ n_significant_bits(::Type{Float8_4}) = 3
 bias(::Type{Float8}) = 3
 bias(::Type{Float8_4}) = 7
 
-eps(::Type{Float8}) = Float8(0x02)
-eps(::Type{Float8_4}) = Float8_4(0x20)
+eps(x::AbstractFloat8) = max(x-prevfloat(x), nextfloat(x)-x)
+eps(::Type{T}) where T <: AbstractFloat8 = eps(one(T))
 
 # define inifinities and nan
 inf8(::Type{Float8}) = Float8(0x70)
