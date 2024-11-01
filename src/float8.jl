@@ -126,7 +126,7 @@ for op in (:+, :-, :*, :/, :\, :^)
 end
 
 for func in (:sin,:cos,:tan,:cis,:sinpi,:cospi,:tanpi,:cispi,:sinh,:cosh,:tanh,
-             :asin,:acos,:atan,,:asinh,:acosh,:atanh,
+             :asin,:acos,:atan,:asinh,:acosh,:atanh,
              :exp,:exp2,:exp10,:expm1,:log,:log2,:log10,:log1p,
              :sqrt,:cbrt,:lgamma)
     @eval begin
