@@ -125,8 +125,10 @@ for op in (:+, :-, :*, :/, :\, :^)
     @eval ($op)(a::Float8_4, b::Float8_4) = Float8_4(($op)(Float32(a), Float32(b)))
 end
 
-for func in (:sin,:cos,:tan,:asin,:acos,:atan,:sinh,:cosh,:tanh,:asinh,:acosh,
-             :atanh,:exp,:exp2,:exp10,:expm1,:log,:log2,:log10,:sqrt,:cbrt,:lgamma,:log1p)
+for func in (:sin,:cos,:tan,:cis,:sinpi,:cospi,:tanpi,:cispi,:sinh,:cosh,:tanh,
+             :asin,:acos,:atan,:asinh,:acosh,:atanh,
+             :exp,:exp2,:exp10,:expm1,:log,:log2,:log10,:log1p,
+             :sqrt,:cbrt,:lgamma)
     @eval begin
         $func(a::Float8) = Float8($func(Float32(a)))
         $func(a::Float8_4) = Float8_4($func(Float32(a)))

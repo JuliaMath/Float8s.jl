@@ -69,21 +69,20 @@ end
 @testset "Conversion Float8 <-> Float32" begin
 
     @testset for i in 0x00:0xff
-        if ~isnan(Float8(i))
+        if !isnan(Float8(i))
             @test i == reinterpret(UInt8,Float8(Float32(Float8(i))))
         end
     end
 end
 
-# Currently not implemented
-# @testset "Conversion Float8_4 <-> Float32" begin
-#
-#     @testset for i in 0x00:0xff
-#         if ~isnan(Float8_4(i))
-#             @test i == reinterpret(UInt8,Float8_4(Float32(Float8_4(i))))
-#         end
-#     end
-# end
+@testset "Conversion Float8_4 <-> Float32" begin
+
+    @testset for i in 0x00:0xff
+        if !isnan(Float8_4(i))
+            @test i == reinterpret(UInt8,Float8_4(Float32(Float8_4(i))))
+        end
+    end
+end
 
 @testset "Negation" begin
 
@@ -91,11 +90,11 @@ end
         f8 = Float8(i)
         f8_4 = Float8_4(i)
 
-        if ~isnan(f8)
+        if !isnan(f8)
             @test f8 == -(-f8)
         end
 
-        if ~isnan(f8_4)
+        if !isnan(f8_4)
             @test f8_4 == -(-f8_4)
         end
     end
@@ -107,12 +106,12 @@ end
         f8 = Float8(i)
         f8_4 = Float8_4(i)
 
-        if ~isnan(f8)
+        if !isnan(f8)
             @test f8 >= floor(f8)
             @test f8 <= ceil(f8)
         end
 
-        if ~isnan(f8_4)
+        if !isnan(f8_4)
             @test f8_4 >= floor(f8_4)
             @test f8_4 <= ceil(f8_4)
         end
@@ -127,7 +126,7 @@ end
             f1 = Float8(i)
             f2 = Float8(j)
 
-            if ~isnan(f1) && ~isnan(f2) && isfinite(f1) && isfinite(f2)
+            if !isnan(f1) && !isnan(f2) && isfinite(f1) && isfinite(f2)
                 @test abs(f1) + abs(f2) >= abs(f1+f2)
                 @test abs(f1) - abs(f2) <= abs(f1-f2)
                 @test abs(f1) * abs(f2) >= f1*f2
@@ -144,7 +143,7 @@ end
             f1 = Float8_4(i)
             f2 = Float8_4(j)
 
-            if ~isnan(f1) && ~isnan(f2) && isfinite(f1) && isfinite(f2)
+            if !isnan(f1) && !isnan(f2) && isfinite(f1) && isfinite(f2)
                 @test abs(f1) + abs(f2) >= abs(f1+f2)
                 @test abs(f1) - abs(f2) <= abs(f1-f2)
                 @test abs(f1) * abs(f2) >= f1*f2
