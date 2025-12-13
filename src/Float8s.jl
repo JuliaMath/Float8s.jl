@@ -4,7 +4,7 @@ module Float8s
                 isnan,iszero,one,zero,abs,isfinite,
                 floatmin,floatmax,typemin,typemax,
                 Float16,Float32,Float64,
-                UInt8,Int8,Int16,Int32,Int64,
+                Bool,UInt8,Int8,Int16,Int32,Int64,
                 (+), (-), (*), (/), (\), (^),
                 sin,cos,tan,asin,acos,atan,sinh,cosh,tanh,asinh,acosh,
                 atanh,exp,exp2,exp10,expm1,log,log2,log10,sqrt,cbrt,log1p,
