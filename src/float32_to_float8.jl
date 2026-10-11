@@ -56,7 +56,7 @@ const F8offset6 = (Float32[
 const F8offset_subnormal = (
     0.0078125f0, 0.0234375f0, 0.0390625f0, 0.0546875f0, 0.0703125f0,
     0.0859375f0, 0.1015625f0, 0.1171875f0, 0.1328125f0, 0.1484375f0,
-    0.1640625f0, 0.1796825f0, 0.1953125f0, 0.2109375f0, 0.2265625f0,
+    0.1640625f0, 0.1796875f0, 0.1953125f0, 0.2109375f0, 0.2265625f0,
     0.2421875f0)
 
 const U8subnormal = (collect(UInt8.(0:15))...,)
@@ -86,8 +86,8 @@ end
 function toUInt8(x::Float32)
     s, absx = signbit(x), abs(x)
     isnan(absx) && return s ? UNaN8|0x80 : UNaN8
-    if absx >= roundsto_floatmax8
-        if absx > floatmaxplus8
+    if absx > roundsto_floatmax8        # the tie at 15.25 goes to 15.0 (even)
+        if absx >= floatmaxplus8        # the tie at 15.75 goes to Inf (even)
             return s ? UInf8|0x80 : UInf8
         else
             return s ? UFloatmax8|0x80 : UFloatmax8
@@ -103,16 +103,18 @@ function toUInt8(x::Float32)
 end
 
 @inline function subnormal8(s::Core.Bool, absx::Float32)
-    idx = findfirst(a->absx <= a, F8offset_subnormal)
+    idx = firstof16lte(absx, F8offset_subnormal)
     return s ? U8subnormal[idx] | 0x80 : U8subnormal[idx]
 end
 
 function normal8(s::Core.Bool, absx::Float32)
-   if absx <= 1.96875f0
-     if absx <= 0.4921875f0
+   # Each section's last midpoint is a tie whose even neighbour is the first
+   # value of the next section, hence `<` at the section boundaries.
+   if absx < 1.96875f0
+     if absx < 0.4921875f0
           idx = UInt8(15+firstof16lte(absx, F8offset1))
           return s ? idx|0x80 : idx
-     elseif absx <= 0.984375f0
+     elseif absx < 0.984375f0
           idx = UInt8(15+16+firstof16lte(absx, F8offset2))
           return s ? idx|0x80 : idx
      else
@@ -120,10 +122,10 @@ function normal8(s::Core.Bool, absx::Float32)
          return s ? idx|0x80 : idx
      end
    else
-     if absx <= 3.9375f0
+     if absx < 3.9375f0
          idx = UInt8(15+32+16+firstof16lte(absx, F8offset4))
          return s ? idx|0x80 : idx
-     elseif absx <= 7.875f0
+     elseif absx < 7.875f0
          idx = UInt8(15+64+firstof16lte(absx, F8offset5))
          return s ? idx|0x80 : idx
      else
@@ -133,9 +135,12 @@ function normal8(s::Core.Bool, absx::Float32)
    end
 end
 
+# haystack[idx] is the midpoint between the code that idx selects and the next
+# code up. In every table that code is even exactly when idx is odd, so a tie
+# stays at idx only for odd idx: round to nearest, ties to even.
 function firstof16lte(needle, haystack)
     for idx = 1:16
-        if needle <= haystack[idx]
+        if isodd(idx) ? needle <= haystack[idx] : needle < haystack[idx]
             return idx
         end
     end

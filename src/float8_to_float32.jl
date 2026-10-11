@@ -42,8 +42,8 @@ const Float8_4toFloat32 = Float32[0.0, 0.001953125, 0.00390625, 0.005859375, 0.0
     -88.0, -96.0, -104.0, -112.0, -120.0, -128.0, -144.0, -160.0, -176.0, -192.0, -208.0, -224.0, -240.0, -Inf, -NaN,
     -NaN, -NaN, -NaN, -NaN, -NaN, -NaN]
 
-Base.Float32(x::Float8) = @inbounds Float8toFloat32[reinterpret(UInt8,x) + 0x01]
-Base.Float32(x::Float8_4) = @inbounds Float8_4toFloat32[reinterpret(UInt8,x) + 0x01]
+Base.Float32(x::Float8) = @inbounds Float8toFloat32[Int(reinterpret(UInt8,x)) + 1]
+Base.Float32(x::Float8_4) = @inbounds Float8_4toFloat32[Int(reinterpret(UInt8,x)) + 1]
 
 # """Old, function-based version."""
 # function Float32(val::T) where {T<:AbstractFloat8}

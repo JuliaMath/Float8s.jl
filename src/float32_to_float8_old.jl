@@ -36,12 +36,7 @@ function create_base_shifttable(::Type{T}) where {T<:AbstractFloat8}
 
     for i = 0:255                               # all possible exponents for Float32
         e = i - 127                             # subtract Float32 bias
-        if e < e_limits[1]                      # Very small numbers map to +- zero
-            basetable[i|0x000+1] = zero(T)
-            basetable[i|0x100+1] = -zero(T)
-            shifttable[i|0x000+1] = n_significant_bits(T)+1
-            shifttable[i|0x100+1] = n_significant_bits(T)+1
-        elseif e < e_limits[2]                  # Small numbers map to denorms
+        if e < e_limits[2]                      # Small numbers map to denorms, or round to +- zero
             basetable[i|0x000+1] = zero(T)
             basetable[i|0x100+1] = -zero(T)
             shifttable[i|0x000+1] = -e+e_shift_subnorm
@@ -54,8 +49,8 @@ function create_base_shifttable(::Type{T}) where {T<:AbstractFloat8}
         elseif e < 128                          # Large numbers map to Infinity
             basetable[i|0x000+1] = inf8(T)
             basetable[i|0x100+1] = -inf8(T)
-            shifttable[i|0x000+1] = n_significant_bits(T)+1
-            shifttable[i|0x100+1] = n_significant_bits(T)+1
+            shifttable[i|0x000+1] = n_significant_bits(Float32)+1   # shift every significand bit out
+            shifttable[i|0x100+1] = n_significant_bits(Float32)+1
         else                                    # Infinity and NaN's stay Infinity and NaN's
             basetable[i|0x000+1] = inf8(T)
             basetable[i|0x100+1] = -inf8(T)

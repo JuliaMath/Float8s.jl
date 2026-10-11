@@ -75,15 +75,51 @@ end
     end
 end
 
-# Currently not implemented
-# @testset "Conversion Float8_4 <-> Float32" begin
-#
-#     @testset for i in 0x00:0xff
-#         if ~isnan(Float8_4(i))
-#             @test i == reinterpret(UInt8,Float8_4(Float32(Float8_4(i))))
-#         end
-#     end
-# end
+@testset "Conversion Float8_4 <-> Float32" begin
+
+    @testset for i in 0x00:0xff
+        if ~isnan(Float8_4(i))
+            @test i == reinterpret(UInt8,Float8_4(Float32(Float8_4(i))))
+        end
+    end
+end
+
+@testset "Round to nearest, ties to even" begin
+    @testset for T in (Float8, Float8_4)
+        # every tie between two finite neighbours goes to the even code
+        for i in 0x00:UInt8(floatmax(T))-0x01
+            mid = (Float32(T(i)) + Float32(T(i+0x01)))/2    # exact in Float32
+            even = iseven(i) ? i : i+0x01
+            @test reinterpret(UInt8,T(mid)) == even
+            @test reinterpret(UInt8,T(-mid)) == even | 0x80
+        end
+        # the tie between floatmax and the next power of two overflows (Inf is even)
+        fmax = Float32(floatmax(T))
+        @test isinf(T(fmax + (fmax - Float32(prevfloat(floatmax(T))))/2))
+    end
+
+    @test Float32(Float8(0.2734375f0)) == 0.28125f0         # tie, was rounded down
+    @test Float32(Float8(15.25f0)) == 15f0                   # tie below floatmax
+    @test isinf(Float8(15.75f0))                             # tie above floatmax
+    @test Float32(Float8(0.179685f0)) == 0.171875f0          # subnormal table typo
+end
+
+@testset "Float8_4 very small and very large" begin
+    @test Float8_4(1f-40) == zero(Float8_4)                  # #22: was 0.0078125
+    @test Float8_4(-1f-40) == -zero(Float8_4)
+    @test Float8_4(2f0^-10) == zero(Float8_4)                # half the smallest subnormal: tie to zero
+    @test Float32(Float8_4(nextfloat(2f0^-10))) == 2f0^-9    # just above: smallest subnormal
+    @test isinf(Float8_4(reinterpret(Float32, 0x43d05b46)))  # 416.7..., was a NaN code
+    @test isinf(Float8_4(1f30))
+    @test isinf(Float8_4(-1f30)) && signbit(Float8_4(-1f30))
+end
+
+@testset "NaN codes decode to NaN" begin                      # #23
+    @testset for i in 0x00:0xff
+        @test isnan(Float8(i)) == isnan(Float32(Float8(i)))
+        @test isnan(Float8_4(i)) == isnan(Float32(Float8_4(i)))
+    end
+end
 
 @testset "Negation" begin
 
